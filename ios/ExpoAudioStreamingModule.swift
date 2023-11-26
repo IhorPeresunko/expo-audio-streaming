@@ -2,8 +2,9 @@ import ExpoModulesCore
 import Foundation
 import AVFoundation
 
-let EMPTY_BUFFER_EVENT = "onBufferEmpty"
-let BUFFER_PLAYED_EVENT = "onBufferPlayed"
+let PLAYER_EMPTY_BUFFER_EVENT = "onBufferEmptyPlayer"
+let PLAYER_BUFFER_PLAYED_EVENT = "onBufferPlayedPlayer"
+let RECORDER_NEW_BUFFER_EVENT = "onNewBufferRecorder"
 
 class AudioPlayer {
   private let engine = AVAudioEngine()
@@ -17,27 +18,9 @@ class AudioPlayer {
   var onBufferPlayed: ((Int) -> Void)?
 
   init() {
-    do {
-      let audioSession = AVAudioSession.sharedInstance()
-      try audioSession.setCategory(.playback, mode: .default)
-      try audioSession.setActive(true)
-    
-    } catch {
-      print("Error in initializing AudioPlayer: \(error)")
-    }
-    
     outputFormat = engine.mainMixerNode.outputFormat(forBus: 0)
 
     engine.attach(player)
-    engine.connect(player, to: engine.mainMixerNode, format: outputFormat)
-  }
-
-  func startEngine() -> Void {
-    do {
-      try engine.start()
-    } catch {
-      print("Error starting the audio engine: \(error)")
-    }
   }
 
   func addToBuffer(buffer: AVAudioPCMBuffer) {
@@ -112,11 +95,21 @@ class AudioPlayer {
   }
   
   func play() {
+    let audioSession = AVAudioSession.sharedInstance()
+    try! audioSession.setCategory(.playback, mode: .default)
+    try! audioSession.setActive(true)
+    
+    engine.connect(player, to: engine.mainMixerNode, format: outputFormat)
+    
+    try! engine.start()
+    
     player.play()
   }
   
   func pause() {
     player.pause()
+    
+    try! AVAudioSession.sharedInstance().setActive(false)
   }
   
   func isPlaying() -> Bool {
@@ -124,29 +117,88 @@ class AudioPlayer {
   }
 }
 
+class AudioRecorder {
+  private let engine = AVAudioEngine()
+  private var inputNode: AVAudioInputNode!
+  private var isRecording = false
+
+  var onNewBuffer: ((String) -> Void)?
+
+  init() {
+    inputNode = engine.inputNode
+  }
+
+  func start() {
+    guard !isRecording else { return }
+    
+    let audioSession = AVAudioSession.sharedInstance()
+    try! audioSession.setCategory(.record, mode: .default)
+    try! audioSession.setActive(true)
+    
+    let recordingFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: AVAudioChannelCount(1), interleaved: true)
+
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] (buffer, _) in
+      self?.processBuffer(buffer)
+    }
+
+    try! engine.start()
+    isRecording = true
+  }
+
+  private func processBuffer(_ buffer: AVAudioPCMBuffer) {
+    let audioBuffer = buffer.audioBufferList.pointee.mBuffers
+
+    let frameSize = Int(buffer.frameLength)
+    let audioDataSize = Int(audioBuffer.mDataByteSize)
+    let audioData = audioBuffer.mData
+
+    let data = Data(bytes: audioData!, count: audioDataSize)
+    let base64String = data.base64EncodedString()
+
+    DispatchQueue.main.async {
+      self.onNewBuffer?(base64String)
+    }
+  }
+
+  func stop() {
+    guard isRecording else { return }
+
+    inputNode.removeTap(onBus: 0)
+    engine.stop()
+    do {
+      try AVAudioSession.sharedInstance().setActive(false)
+    } catch {
+      print("Error deactivating audio session: \(error)")
+    }
+    
+    isRecording = false
+  }
+}
+
 public class ExpoAudioStreamingModule: Module {
   private let audioPlayer = AudioPlayer()
+  private let audioRecorder = AudioRecorder()
 
   public func definition() -> ModuleDefinition {
     Name("ExpoAudioStreaming")
-      
-    Function("init") {
-      self.audioPlayer.onBufferPlayed = self.onBufferPlayed
-      self.audioPlayer.onBufferFinished = self.onBufferFinished
-      self.audioPlayer.startEngine()
+
+    Events(PLAYER_BUFFER_PLAYED_EVENT, PLAYER_EMPTY_BUFFER_EVENT, RECORDER_NEW_BUFFER_EVENT)
+    
+    /* ------- PLAYER ------- */
+    Function("initPlayer") {
+      self.audioPlayer.onBufferPlayed = self.onPlayerBufferPlayed
+      self.audioPlayer.onBufferFinished = self.onPlayerBufferFinished
     }
 
-    Function("play") {
+    Function("playPlayer") {
       self.audioPlayer.play()
     }
 
-    Function("pause") {
+    Function("pausePlayer") {
       self.audioPlayer.pause()
-    }
-    
-    Events(BUFFER_PLAYED_EVENT, EMPTY_BUFFER_EVENT)
+    }    
 
-    Function("addToQueue") { (chunk: String) in
+    Function("addToQueuePlayer") { (chunk: String) in
       guard let audioBuffer = self.audioPlayer.decodeAudioData(chunk) else {
         print("failed auido buffer")
         return
@@ -154,17 +206,34 @@ public class ExpoAudioStreamingModule: Module {
 
       self.audioPlayer.addToBuffer(buffer: audioBuffer)
     }
+    
+    /* ------- RECORDER ------- */
+    Function("initRecorder") {
+      self.audioRecorder.onNewBuffer = self.onRecorderBuffer
+    }
+
+    Function("startRecorder") {
+      self.audioRecorder.start()
+    }
+
+    Function("stopRecorder") {
+      self.audioRecorder.stop()
+    }
   }
   
-  @objc
-  private func onBufferPlayed(buffersInQueue: Int) {
-    sendEvent(BUFFER_PLAYED_EVENT, [
+  private func onPlayerBufferPlayed(buffersInQueue: Int) {
+    sendEvent(PLAYER_BUFFER_PLAYED_EVENT, [
       "buffersInQueue": buffersInQueue
     ])
   }
   
-  @objc
-  private func onBufferFinished() {
-    sendEvent(EMPTY_BUFFER_EVENT)
+  private func onPlayerBufferFinished() {
+    sendEvent(PLAYER_EMPTY_BUFFER_EVENT)
+  }
+  
+  private func onRecorderBuffer(base64: String) {
+    sendEvent(RECORDER_NEW_BUFFER_EVENT, [
+      "buffer": base64
+    ])
   }
 }

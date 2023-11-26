@@ -1,16 +1,16 @@
-import * as ExpoAudioStreamingModule from "expo-audio-streaming";
+import { Player, Types } from "expo-audio-streaming";
 import { useState, useCallback, useEffect } from "react";
 
 export const usePlayer = () => {
   const [playing, setPlaying] = useState(false);
 
   const play = useCallback(() => {
-    ExpoAudioStreamingModule.play();
+    Player.play();
     setPlaying(true);
   }, [setPlaying]);
 
   const pause = useCallback(() => {
-    ExpoAudioStreamingModule.pause();
+    Player.pause();
     setPlaying(false);
   }, [setPlaying]);
 
@@ -18,22 +18,19 @@ export const usePlayer = () => {
     setPlaying(false);
   }, [setPlaying]);
 
-  const onBufferPlayed = useCallback(
-    (event: ExpoAudioStreamingModule.Types.BufferPlayedEvent) => {
-      return event;
-    },
-    []
-  );
+  const onBufferPlayed = useCallback((event: Types.PlayerBufferPlayedEvent) => {
+    return event;
+  }, []);
 
   const addToBuffer = useCallback((base64: string) => {
-    ExpoAudioStreamingModule.addToQueue(base64);
+    Player.addToQueue(base64);
   }, []);
 
   useEffect(() => {
     const onBufferEmptyListener =
-      ExpoAudioStreamingModule.addOnBufferEmptyListener(onBufferEmpty);
+      Player.addOnBufferEmptyListener(onBufferEmpty);
     const onBufferPlayedListener =
-      ExpoAudioStreamingModule.addOnBufferPlayedListener(onBufferPlayed);
+      Player.addOnBufferPlayedListener(onBufferPlayed);
     return () => {
       onBufferEmptyListener.remove();
       onBufferPlayedListener.remove();
@@ -41,7 +38,7 @@ export const usePlayer = () => {
   }, [onBufferEmpty, onBufferPlayed]);
 
   useEffect(() => {
-    ExpoAudioStreamingModule.init();
+    Player.init();
   }, []);
 
   return {

@@ -11,32 +11,52 @@ function addListener(
   return emitter.addListener(eventName, listener);
 }
 
-export function addOnBufferEmptyListener(
-  listener: (event) => void
-): Subscription {
-  return addListener("onBufferEmpty", listener);
-}
+export const Player = {
+  addOnBufferPlayedListener(
+    listener: (event: Types.PlayerBufferPlayedEvent) => void
+  ): Subscription {
+    return addListener("onBufferPlayedPlayer", listener);
+  },
 
-export function addOnBufferPlayedListener(
-  listener: (event) => Types.BufferPlayedEvent
-): Subscription {
-  return addListener("onBufferPlayed", listener);
-}
+  addOnBufferEmptyListener(listener: (event) => void): Subscription {
+    return addListener("onBufferEmptyPlayer", listener);
+  },
 
-export function play(): void {
-  ExpoAudioStreamingModule.play();
-}
+  play(): void {
+    ExpoAudioStreamingModule.playPlayer();
+  },
 
-export function pause(): void {
-  ExpoAudioStreamingModule.pause();
-}
+  pause(): void {
+    ExpoAudioStreamingModule.pausePlayer();
+  },
 
-export function addToQueue(base64: string) {
-  ExpoAudioStreamingModule.addToQueue(base64);
-}
+  addToQueue(base64: string) {
+    ExpoAudioStreamingModule.addToQueuePlayer(base64);
+  },
 
-export function init() {
-  ExpoAudioStreamingModule.init();
-}
+  init() {
+    ExpoAudioStreamingModule.initPlayer();
+  },
+};
+
+export const Recorder = {
+  addOnNewBufferListener(
+    listener: (event: Types.RecorderNewBufferEvent) => void
+  ): Subscription {
+    return addListener("onNewBufferRecorder", listener);
+  },
+
+  init(): void {
+    ExpoAudioStreamingModule.initRecorder();
+  },
+
+  start(): void {
+    ExpoAudioStreamingModule.startRecorder();
+  },
+
+  stop(): void {
+    ExpoAudioStreamingModule.stopRecorder();
+  },
+};
 
 export * as Types from "./ExpoAudioStreamingModule.types";
