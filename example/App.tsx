@@ -1,5 +1,4 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Base64 from "base-64";
 
 import { usePlayer } from "./usePlayer";
 import { audio } from "./mock-stream";

@@ -1,15 +1,45 @@
 # expo-audio-streaming
 
-Module to play dynamic audio stream
+This module is designed to play dynamic audio streams and record audio streams from the microphone. It's an ideal solution for apps that require real-time audio processing and streaming capabilities.
+
+### Disclaimers
+#### Early Stage Development
+Please note that this package is in its early stages of development. It has not been extensively tested across all environments and use cases. Users should integrate this package into their projects at their own risk.
+
+#### iOS-Only Support
+Currently, expo-audio-streaming supports iOS only. Future updates are planned to extend support to Android platforms. Feel free to contribute.
 
 # API documentation
 
-- [Documentation for the main branch](https://github.com/expo/expo/blob/main/docs/pages/versions/unversioned/sdk/audio-streaming.md)
-- [Documentation for the latest stable release](https://docs.expo.dev/versions/latest/sdk/audio-streaming/)
+### Example Usage
+Refer to the [example folder](https://github.com/IhorPeresunko/expo-audio-streaming-module/tree/main/example) to see how the player and recorder are utilized in a practical scenario. It is recommended to directly use the useRecorder and usePlayer hooks provided in the example. ([useRecorder.tsx](https://github.com/IhorPeresunko/expo-audio-streaming-module/blob/main/example/useRecorder.tsx), [usePlayer.tsx](https://github.com/IhorPeresunko/expo-audio-streaming-module/blob/main/example/usePlayer.tsx))
+
+### Using the Player
+Integrating the audio player into your application is straightforward. Here's a basic example:
+
+```javascript
+const { addToBuffer, play, pause, playing } = usePlayer();
+
+// Use these methods to control the audio player
+```
+
+### Using the Recorder
+Similarly, incorporating the audio recorder is just as simple. Here's a quick guide:
+
+```javascript
+const { start, stop, recording, buffer } = useRecorder({
+  onNewBuffer: (event) => event.buffer,
+});
+
+// 'buffer' will be the base64 representation of your audio stream
+```
 
 # Installation in managed Expo projects
 
-For [managed](https://docs.expo.dev/archive/managed-vs-bare/) Expo projects, please follow the installation instructions in the [API documentation for the latest stable release](#api-documentation). If you follow the link and there is no documentation available then this library is not yet usable within managed projects &mdash; it is likely to be included in an upcoming Expo SDK release.
+For [managed](https://docs.expo.dev/archive/managed-vs-bare/) Expo projects, please use this command:
+```
+npx expo install expo-audio-streaming
+```
 
 # Installation in bare React Native projects
 
