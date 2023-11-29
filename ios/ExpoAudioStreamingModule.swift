@@ -119,25 +119,23 @@ class AudioPlayer {
 
 class AudioRecorder {
   private let engine = AVAudioEngine()
-  private var inputNode: AVAudioInputNode!
   private var isRecording = false
 
   var onNewBuffer: ((String) -> Void)?
 
   init() {
-    inputNode = engine.inputNode
-  }
+    }
 
   func start() {
     guard !isRecording else { return }
     
     let audioSession = AVAudioSession.sharedInstance()
-    try! audioSession.setCategory(.record, mode: .default)
+    try! audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers, .allowBluetooth, .allowAirPlay])
     try! audioSession.setActive(true)
-    
-    let recordingFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: AVAudioChannelCount(1), interleaved: true)
 
-    inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] (buffer, _) in
+    let recordingFormat = engine.inputNode.inputFormat(forBus: 0)
+
+    engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: recordingFormat) { [weak self] (buffer, _) in
       self?.processBuffer(buffer)
     }
 
@@ -148,7 +146,6 @@ class AudioRecorder {
   private func processBuffer(_ buffer: AVAudioPCMBuffer) {
     let audioBuffer = buffer.audioBufferList.pointee.mBuffers
 
-    let frameSize = Int(buffer.frameLength)
     let audioDataSize = Int(audioBuffer.mDataByteSize)
     let audioData = audioBuffer.mData
 
@@ -163,7 +160,7 @@ class AudioRecorder {
   func stop() {
     guard isRecording else { return }
 
-    inputNode.removeTap(onBus: 0)
+    engine.inputNode.removeTap(onBus: 0)
     engine.stop()
     do {
       try AVAudioSession.sharedInstance().setActive(false)
