@@ -1,7 +1,13 @@
 import { Player, Types } from "expo-audio-streaming";
 import { useState, useCallback, useEffect } from "react";
 
-export const usePlayer = () => {
+export const usePlayer = ({
+  config,
+  onBufferEmpty,
+}: {
+  onBufferEmpty?: () => void;
+  config?: Types.PlayerConfiguration;
+} = {}) => {
   const [playing, setPlaying] = useState(false);
 
   const play = useCallback(() => {
@@ -14,8 +20,9 @@ export const usePlayer = () => {
     setPlaying(false);
   }, [setPlaying]);
 
-  const onBufferEmpty = useCallback(() => {
+  const _onBufferEmpty = useCallback(() => {
     setPlaying(false);
+    onBufferEmpty?.();
   }, [setPlaying]);
 
   const onBufferPlayed = useCallback((event: Types.PlayerBufferPlayedEvent) => {
@@ -28,17 +35,17 @@ export const usePlayer = () => {
 
   useEffect(() => {
     const onBufferEmptyListener =
-      Player.addOnBufferEmptyListener(onBufferEmpty);
+      Player.addOnBufferEmptyListener(_onBufferEmpty);
     const onBufferPlayedListener =
       Player.addOnBufferPlayedListener(onBufferPlayed);
     return () => {
       onBufferEmptyListener.remove();
       onBufferPlayedListener.remove();
     };
-  }, [onBufferEmpty, onBufferPlayed]);
+  }, [_onBufferEmpty, onBufferPlayed]);
 
   useEffect(() => {
-    Player.init();
+    Player.init(config);
   }, []);
 
   return {

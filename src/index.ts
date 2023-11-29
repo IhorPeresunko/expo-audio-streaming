@@ -34,8 +34,14 @@ export const Player = {
     ExpoAudioStreamingModule.addToQueuePlayer(base64);
   },
 
-  init() {
-    ExpoAudioStreamingModule.initPlayer();
+  init(config: Types.PlayerConfiguration = {}): void {
+    const c: Types.PlayerConfiguration = {
+      sampleRate: 44100,
+      channels: 1,
+      ...config,
+    };
+
+    ExpoAudioStreamingModule.initPlayer(c.sampleRate, c.channels);
   },
 };
 

@@ -6,10 +6,15 @@ let PLAYER_EMPTY_BUFFER_EVENT = "onBufferEmptyPlayer"
 let PLAYER_BUFFER_PLAYED_EVENT = "onBufferPlayedPlayer"
 let RECORDER_NEW_BUFFER_EVENT = "onNewBufferRecorder"
 
+struct PlayerConfiguration {
+  let sampleRate: Double
+  let channels: Int
+}
+
 class AudioPlayer {
   private let engine = AVAudioEngine()
   private let player = AVAudioPlayerNode()
-  private let inputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: AVAudioChannelCount(1), interleaved: true)
+  private let inputFormat: AVAudioFormat!
   private let outputFormat: AVAudioFormat
   
   private var buffersInQueue = 0
@@ -17,7 +22,8 @@ class AudioPlayer {
   var onBufferFinished: (() -> Void)?
   var onBufferPlayed: ((Int) -> Void)?
 
-  init() {
+  init(config: PlayerConfiguration) {
+    inputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: config.sampleRate, channels: AVAudioChannelCount(config.channels), interleaved: true)
     outputFormat = engine.mainMixerNode.outputFormat(forBus: 0)
 
     engine.attach(player)
@@ -133,7 +139,8 @@ class AudioRecorder {
     try! audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers, .allowBluetooth, .allowAirPlay])
     try! audioSession.setActive(true)
 
-    let recordingFormat = engine.inputNode.inputFormat(forBus: 0)
+    let hwNode = engine.inputNode.inputFormat(forBus: 0)
+    let recordingFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: hwNode.sampleRate, channels: hwNode.channelCount, interleaved: true)
 
     engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: recordingFormat) { [weak self] (buffer, _) in
       self?.processBuffer(buffer)
@@ -173,8 +180,8 @@ class AudioRecorder {
 }
 
 public class ExpoAudioStreamingModule: Module {
-  private let audioPlayer = AudioPlayer()
-  private let audioRecorder = AudioRecorder()
+  private var audioPlayer: AudioPlayer!
+  private var audioRecorder: AudioRecorder!
 
   public func definition() -> ModuleDefinition {
     Name("ExpoAudioStreaming")
@@ -182,7 +189,10 @@ public class ExpoAudioStreamingModule: Module {
     Events(PLAYER_BUFFER_PLAYED_EVENT, PLAYER_EMPTY_BUFFER_EVENT, RECORDER_NEW_BUFFER_EVENT)
     
     /* ------- PLAYER ------- */
-    Function("initPlayer") {
+    Function("initPlayer") { (sampleRate: Double, channels: Int) in
+      let config = PlayerConfiguration(sampleRate: sampleRate, channels: channels)
+      
+      self.audioPlayer = AudioPlayer(config: config)
       self.audioPlayer.onBufferPlayed = self.onPlayerBufferPlayed
       self.audioPlayer.onBufferFinished = self.onPlayerBufferFinished
     }
@@ -206,6 +216,7 @@ public class ExpoAudioStreamingModule: Module {
     
     /* ------- RECORDER ------- */
     Function("initRecorder") {
+      self.audioRecorder = AudioRecorder()
       self.audioRecorder.onNewBuffer = self.onRecorderBuffer
     }
 

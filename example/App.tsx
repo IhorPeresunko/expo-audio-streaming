@@ -5,7 +5,11 @@ import { audio } from "./mock-stream";
 import { useRecorder } from "./useRecorder";
 
 export default function App() {
-  const { addToBuffer, play, pause, playing } = usePlayer();
+  const { addToBuffer, play, pause, playing } = usePlayer({
+    config: {
+      sampleRate: 24000,
+    },
+  });
   const { start, stop, recording, buffer } = useRecorder({
     onNewBuffer: (event) => event,
   });
