@@ -61,8 +61,8 @@ export const Recorder = {
     ExpoAudioStreamingModule.initRecorder(c.outputSampleRate);
   },
 
-  start(): void {
-    ExpoAudioStreamingModule.startRecorder();
+  start(): Promise<void> {
+    return ExpoAudioStreamingModule.startRecorder();
   },
 
   stop(): void {

@@ -259,8 +259,14 @@ public class ExpoAudioStreamingModule: Module {
       self.audioRecorder.onNewBuffer = self.onRecorderBuffer
     }
 
-    Function("startRecorder") {
-      self.audioRecorder.start()
+    AsyncFunction("startRecorder") { [weak self] (promise: Promise) in
+      DispatchQueue.global(qos: .background).async {
+        self?.audioRecorder.start()
+        
+        DispatchQueue.main.async {
+          promise.resolve()
+        }
+      }
     }
 
     Function("stopRecorder") {

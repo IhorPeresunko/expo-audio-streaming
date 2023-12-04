@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { usePlayer } from "./usePlayer";
 import { audio } from "./mock-stream";
 import { useRecorder } from "./useRecorder";
+import Spinner from "./Spinner";
 
 export default function App() {
   const { addToBuffer, play, pause, playing } = usePlayer({
@@ -64,6 +65,9 @@ export default function App() {
       >
         <Text>Stream recording buffer to player</Text>
       </TouchableOpacity>
+
+      {/* To check if im not blocking main thread */}
+      <Spinner />
     </View>
   );
 }

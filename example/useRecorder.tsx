@@ -19,8 +19,8 @@ export const useRecorder = ({
   const [recording, setRecording] = useState(false);
   const [buffer, setBuffer] = useState<string[]>([]);
 
-  const start = useCallback(() => {
-    Recorder.start();
+  const start = useCallback(async () => {
+    await Recorder.start();
     setRecording(true);
   }, [setRecording]);
 
