@@ -3,8 +3,18 @@ import { useState, useCallback, useEffect } from "react";
 
 export const useRecorder = ({
   onNewBuffer,
+  outputSampleRate,
 }: {
+  /**
+   * Callback when a new buffer is recorded
+   * @param event.buffer The base64 encoded buffer
+   */
   onNewBuffer: (event: Types.RecorderNewBufferEvent) => void;
+  /**
+   * The sample rate of the output buffer
+   * @default 16000
+   */
+  outputSampleRate?: number;
 }) => {
   const [recording, setRecording] = useState(false);
   const [buffer, setBuffer] = useState<string[]>([]);
@@ -36,7 +46,7 @@ export const useRecorder = ({
   }, [_onNewBuffer]);
 
   useEffect(() => {
-    Recorder.init();
+    Recorder.init({ outputSampleRate });
   }, []);
 
   return {

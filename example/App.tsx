@@ -7,11 +7,12 @@ import { useRecorder } from "./useRecorder";
 export default function App() {
   const { addToBuffer, play, pause, playing } = usePlayer({
     config: {
-      sampleRate: 24000,
+      sampleRate: 44000,
     },
   });
   const { start, stop, recording, buffer } = useRecorder({
     onNewBuffer: (event) => event,
+    outputSampleRate: 44000,
   });
 
   const startStreamingMockData = () => {

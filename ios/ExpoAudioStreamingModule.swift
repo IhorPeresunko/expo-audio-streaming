@@ -11,6 +11,10 @@ struct PlayerConfiguration {
   let channels: Int
 }
 
+struct RecorderConfiguration {
+  let outputSampleRate: Double
+}
+
 class AudioPlayer {
   private let engine = AVAudioEngine()
   private let player = AVAudioPlayerNode()
@@ -128,11 +132,16 @@ class AudioPlayer {
 class AudioRecorder {
   private let engine = AVAudioEngine()
   private var isRecording = false
+  
+  private var outputSampleRate: Double
+  private var outputFormat: AVAudioFormat
 
   var onNewBuffer: ((String) -> Void)?
 
-  init() {
-    }
+  init(config: RecorderConfiguration) {
+    self.outputSampleRate = config.outputSampleRate
+    self.outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: outputSampleRate, channels: 1, interleaved: true)!
+  }
 
   func start() {
     guard !isRecording else { return }
@@ -141,15 +150,38 @@ class AudioRecorder {
     try! audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers, .allowBluetooth, .allowAirPlay])
     try! audioSession.setActive(true)
 
-    let hwNode = engine.inputNode.inputFormat(forBus: 0)
-    let recordingFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: hwNode.sampleRate, channels: hwNode.channelCount, interleaved: true)
-
-    engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: recordingFormat) { [weak self] (buffer, _) in
-      self?.processBuffer(buffer)
+    let inputFormat = engine.inputNode.inputFormat(forBus: 0)
+    
+    engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] (buffer, _) in
+      guard let self = self else { return }
+      
+      if (inputFormat.sampleRate != self.outputFormat.sampleRate) {
+        if let outputBuffer = self.convertSampleRate(inputBuffer: buffer) {
+          self.processBuffer(outputBuffer)
+        }
+      } else {
+        self.processBuffer(buffer)
+      }
     }
 
     try! engine.start()
     isRecording = true
+  }
+  
+  func convertSampleRate(inputBuffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+    let outputFrameCapacity = AVAudioFrameCount(
+      round(Double(inputBuffer.frameLength) * (outputFormat.sampleRate / inputBuffer.format.sampleRate))
+    )
+
+    guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCapacity) else { return nil }
+    guard let converter = AVAudioConverter(from: inputBuffer.format, to: outputFormat) else { return nil }
+
+    converter.convert(to: outputBuffer, error: nil) { packetCount, status in
+      status.pointee = .haveData
+      return inputBuffer
+    }
+
+    return outputBuffer
   }
 
   private func processBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -220,8 +252,10 @@ public class ExpoAudioStreamingModule: Module {
     }
     
     /* ------- RECORDER ------- */
-    Function("initRecorder") {
-      self.audioRecorder = AudioRecorder()
+    Function("initRecorder") { (outputSampleRate: Double) in
+      let config = RecorderConfiguration(outputSampleRate: outputSampleRate)
+
+      self.audioRecorder = AudioRecorder(config: config)
       self.audioRecorder.onNewBuffer = self.onRecorderBuffer
     }
 

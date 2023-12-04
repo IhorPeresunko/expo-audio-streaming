@@ -52,8 +52,13 @@ export const Recorder = {
     return addListener("onNewBufferRecorder", listener);
   },
 
-  init(): void {
-    ExpoAudioStreamingModule.initRecorder();
+  init(config: Types.RecorderConfiguration = {}): void {
+    const c: Types.RecorderConfiguration = {
+      outputSampleRate: 16000,
+      ...config,
+    };
+
+    ExpoAudioStreamingModule.initRecorder(c.outputSampleRate);
   },
 
   start(): void {
