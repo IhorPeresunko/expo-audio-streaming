@@ -38,7 +38,9 @@ class AudioPlayer {
     self.buffersInQueue += 1
 
     player.scheduleBuffer(buffer) {
-      DispatchQueue.main.async {
+      DispatchQueue.main.async { [weak self] in
+        guard let self else { return }
+
         self.buffersInQueue -= 1
         self.onBufferPlayed?(self.buffersInQueue)
         
@@ -155,12 +157,15 @@ class AudioRecorder {
 
     let audioDataSize = Int(audioBuffer.mDataByteSize)
     let audioData = audioBuffer.mData
+    
+    if let safeAudioData = audioData {
+      let data = Data(bytes: safeAudioData, count: audioDataSize)
 
-    let data = Data(bytes: audioData!, count: audioDataSize)
-    let base64String = data.base64EncodedString()
+      let base64String = data.base64EncodedString()
 
-    DispatchQueue.main.async {
-      self.onNewBuffer?(base64String)
+      DispatchQueue.main.async {
+        self.onNewBuffer?(base64String)
+      }
     }
   }
 
