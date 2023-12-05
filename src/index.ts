@@ -33,16 +33,6 @@ export const Player = {
   addToQueue(base64: string) {
     ExpoAudioStreamingModule.addToQueuePlayer(base64);
   },
-
-  init(config: Types.PlayerConfiguration = {}): void {
-    const c: Types.PlayerConfiguration = {
-      sampleRate: 44100,
-      channels: 1,
-      ...config,
-    };
-
-    ExpoAudioStreamingModule.initPlayer(c.sampleRate, c.channels);
-  },
 };
 
 export const Recorder = {
@@ -52,22 +42,31 @@ export const Recorder = {
     return addListener("onNewBufferRecorder", listener);
   },
 
-  init(config: Types.RecorderConfiguration = {}): void {
-    const c: Types.RecorderConfiguration = {
-      outputSampleRate: 16000,
-      ...config,
-    };
-
-    ExpoAudioStreamingModule.initRecorder(c.outputSampleRate);
-  },
-
-  start(): Promise<void> {
-    return ExpoAudioStreamingModule.startRecorder();
+  start(): void {
+    ExpoAudioStreamingModule.startRecorder();
   },
 
   stop(): void {
     ExpoAudioStreamingModule.stopRecorder();
   },
+};
+
+export const AudioSession = {
+  init: (config: Types.AudioSessionConfiguration = {}) => {
+    const c: Types.AudioSessionConfiguration = {
+      playerSampleRate: 44100,
+      playerChannels: 1,
+      recorderSampleRate: 44100,
+      ...config,
+    };
+
+    ExpoAudioStreamingModule.init(
+      c.recorderSampleRate,
+      c.playerSampleRate,
+      c.playerChannels
+    );
+  },
+  destroy: ExpoAudioStreamingModule.destroy,
 };
 
 export * as Types from "./ExpoAudioStreamingModule.types";

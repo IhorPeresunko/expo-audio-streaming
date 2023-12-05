@@ -1,20 +1,26 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { AudioSession } from "expo-audio-streaming";
 
 import { usePlayer } from "./usePlayer";
 import { audio } from "./mock-stream";
 import { useRecorder } from "./useRecorder";
 import Spinner from "./Spinner";
+import { useEffect } from "react";
 
 export default function App() {
-  const { addToBuffer, play, pause, playing } = usePlayer({
-    config: {
-      sampleRate: 44000,
-    },
-  });
-  const { start, stop, recording, buffer } = useRecorder({
-    onNewBuffer: (event) => event,
-    outputSampleRate: 44000,
-  });
+  const { addToBuffer, play, pause, playing } = usePlayer();
+  const { start, stop, recording, buffer } = useRecorder();
+
+  useEffect(() => {
+    AudioSession.init({
+      playerSampleRate: 44100,
+      recorderSampleRate: 44100,
+    });
+
+    return () => {
+      AudioSession.destroy();
+    };
+  }, [AudioSession]);
 
   const startStreamingMockData = () => {
     for (let i = 0; i < audio.length; i++) {

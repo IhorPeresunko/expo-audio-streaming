@@ -3,24 +3,18 @@ import { useState, useCallback, useEffect } from "react";
 
 export const useRecorder = ({
   onNewBuffer,
-  outputSampleRate,
 }: {
   /**
    * Callback when a new buffer is recorded
    * @param event.buffer The base64 encoded buffer
    */
-  onNewBuffer: (event: Types.RecorderNewBufferEvent) => void;
-  /**
-   * The sample rate of the output buffer
-   * @default 16000
-   */
-  outputSampleRate?: number;
-}) => {
+  onNewBuffer?: (event: Types.RecorderNewBufferEvent) => void;
+} = {}) => {
   const [recording, setRecording] = useState(false);
   const [buffer, setBuffer] = useState<string[]>([]);
 
   const start = useCallback(async () => {
-    await Recorder.start();
+    Recorder.start();
     setRecording(true);
   }, [setRecording]);
 
@@ -32,7 +26,7 @@ export const useRecorder = ({
   const _onNewBuffer = useCallback(
     (event: Types.RecorderNewBufferEvent) => {
       setBuffer((prev) => [...prev, event.buffer]);
-      onNewBuffer(event);
+      onNewBuffer?.(event);
     },
     [onNewBuffer, setBuffer]
   );
@@ -44,10 +38,6 @@ export const useRecorder = ({
       onNewBufferListener.remove();
     };
   }, [_onNewBuffer]);
-
-  useEffect(() => {
-    Recorder.init({ outputSampleRate });
-  }, []);
 
   return {
     start,

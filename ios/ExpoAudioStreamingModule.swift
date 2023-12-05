@@ -9,14 +9,80 @@ let RECORDER_NEW_BUFFER_EVENT = "onNewBufferRecorder"
 struct PlayerConfiguration {
   let sampleRate: Double
   let channels: Int
+  let engine: AVAudioEngine
 }
 
 struct RecorderConfiguration {
   let outputSampleRate: Double
+  let engine: AVAudioEngine
 }
 
+class AudioEngineManager {
+  let engine = AVAudioEngine()
+  let recorder: AudioRecorder
+  let player: AudioPlayer
+
+  init(recorderSampleRate: Double, playerSampleRate: Double, playerChannels: Int) {
+    self.recorder = AudioRecorder(config: RecorderConfiguration(outputSampleRate: recorderSampleRate, engine: engine))
+    self.player = AudioPlayer(config: PlayerConfiguration(sampleRate: playerSampleRate, channels: playerChannels, engine: engine))
+  }
+
+  func startAudioSession() {
+    let audioSession = AVAudioSession.sharedInstance()
+    do {
+      try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowAirPlay, .defaultToSpeaker, .interruptSpokenAudioAndMixWithOthers])
+      try audioSession.setActive(true)
+      
+      NSLog("[ExpoAudioStreaming] Audio Session Started")
+    } catch {
+      NSLog("[ExpoAudioStreaming] Failed to set audio session category: \(error)")
+    }
+  }
+  
+  func stopAudioSession() {
+    try! AVAudioSession.sharedInstance().setActive(false)
+  }
+  
+  func startEngine() {
+    if !engine.isRunning {
+      do {
+        try engine.start()
+        NSLog("[ExpoAudioStreaming] Engine Started")
+      } catch {
+        NSLog("[ExpoAudioStreaming] Could not start audio engine: \(error)")
+      }
+    }
+  }
+
+  func stopEngine() {
+    engine.stop()
+  }
+  
+  func playerStart() {
+    self.startEngine()
+    self.player.play()
+  }
+  
+  func playerStop() {
+    self.player.pause()
+  }
+  
+  func recordStart() {
+    self.startEngine()
+    self.recorder.start()
+  }
+  
+  func recordStop() {
+    if engine.isRunning {
+      engine.stop()
+    }
+    self.recorder.stop()
+  }
+}
+
+
 class AudioPlayer {
-  private let engine = AVAudioEngine()
+  private let engine: AVAudioEngine
   private let player = AVAudioPlayerNode()
   private let inputFormat: AVAudioFormat!
   private let outputFormat: AVAudioFormat
@@ -27,15 +93,20 @@ class AudioPlayer {
   var onBufferPlayed: ((Int) -> Void)?
 
   init(config: PlayerConfiguration) {
+    self.engine = config.engine
+
     inputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: config.sampleRate, channels: AVAudioChannelCount(config.channels), interleaved: true)
     outputFormat = engine.mainMixerNode.outputFormat(forBus: 0)
 
-    engine.attach(player)
+    if !engine.attachedNodes.contains(player) {
+      engine.attach(player)
+    }
+    engine.connect(player, to: engine.mainMixerNode, format: nil)
   }
 
   func addToBuffer(buffer: AVAudioPCMBuffer) {
     guard buffer.format.isEqual(outputFormat) else {
-      print("no equal \(buffer.format) \(String(describing: outputFormat))")
+      NSLog("[ExpoAudioStreaming] no equal \(buffer.format) \(String(describing: outputFormat))")
       return
     }
     
@@ -57,18 +128,18 @@ class AudioPlayer {
 
   func decodeAudioData(_ base64String: String) -> AVAudioPCMBuffer? {
     guard let data = Data(base64Encoded: base64String) else {
-      print("Error decoding base64 data")
+      NSLog("[ExpoAudioStreaming] Error decoding base64 data")
       return nil
     }
 
     guard let inputFormat = inputFormat else {
-      print("Error: Audio format is nil")
+      NSLog("[ExpoAudioStreaming] Error: Audio format is nil")
       return nil
     }
 
     let frameCount = UInt32(data.count) / inputFormat.streamDescription.pointee.mBytesPerFrame
     guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: frameCount) else {
-      print("Error creating AVAudioPCMBuffer")
+      NSLog("[ExpoAudioStreaming] Error creating AVAudioPCMBuffer")
       return nil
     }
     
@@ -80,13 +151,13 @@ class AudioPlayer {
     }
     
     guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-      print("Error creating audio converter")
+      NSLog("[ExpoAudioStreaming] Error creating audio converter")
       return nil
     }
     
     let converterFrameCapacity = AVAudioFrameCount(outputFormat.sampleRate / inputFormat.sampleRate * Double(inputBuffer.frameCapacity))
     guard let convertedBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: converterFrameCapacity) else {
-       print("Error creating converted buffer")
+       NSLog("[ExpoAudioStreaming] Error creating converted buffer")
        return nil
      }
      convertedBuffer.frameLength = convertedBuffer.frameCapacity
@@ -99,7 +170,7 @@ class AudioPlayer {
     converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputBlock)
 
     if let error = error {
-      print("Error during conversion: \(error)")
+      NSLog("[ExpoAudioStreaming] Error during conversion: \(error)")
       return nil
     }
       
@@ -107,21 +178,11 @@ class AudioPlayer {
   }
   
   func play() {
-    let audioSession = AVAudioSession.sharedInstance()
-    try! audioSession.setCategory(.playback, mode: .default)
-    try! audioSession.setActive(true)
-    
-    engine.connect(player, to: engine.mainMixerNode, format: outputFormat)
-    
-    try! engine.start()
-    
     player.play()
   }
   
   func pause() {
     player.pause()
-    
-    try! AVAudioSession.sharedInstance().setActive(false)
   }
   
   func isPlaying() -> Bool {
@@ -130,29 +191,31 @@ class AudioPlayer {
 }
 
 class AudioRecorder {
-  private let engine = AVAudioEngine()
+  private let engine: AVAudioEngine
   private var isRecording = false
   
   private var outputSampleRate: Double
   private var outputFormat: AVAudioFormat
+  private let inputNode: AVAudioInputNode
+  
 
   var onNewBuffer: ((String) -> Void)?
 
   init(config: RecorderConfiguration) {
+    self.engine = config.engine
+
     self.outputSampleRate = config.outputSampleRate
     self.outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: outputSampleRate, channels: 1, interleaved: true)!
+    
+    self.inputNode = engine.inputNode
   }
 
   func start() {
     guard !isRecording else { return }
-    
-    let audioSession = AVAudioSession.sharedInstance()
-    try! audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers, .allowBluetooth, .allowAirPlay])
-    try! audioSession.setActive(true)
 
-    let inputFormat = engine.inputNode.inputFormat(forBus: 0)
-    
-    engine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] (buffer, _) in
+    let inputFormat = inputNode.inputFormat(forBus: 0)
+
+    inputNode.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] (buffer, _) in
       guard let self = self else { return }
       
       if (inputFormat.sampleRate != self.outputFormat.sampleRate) {
@@ -164,7 +227,6 @@ class AudioRecorder {
       }
     }
 
-    try! engine.start()
     isRecording = true
   }
   
@@ -203,20 +265,13 @@ class AudioRecorder {
 
   func stop() {
     guard isRecording else { return }
-
-    engine.inputNode.removeTap(onBus: 0)
-    engine.stop()
-    do {
-      try AVAudioSession.sharedInstance().setActive(false)
-    } catch {
-      print("Error deactivating audio session: \(error)")
-    }
-    
+    inputNode.removeTap(onBus: 0)
     isRecording = false
   }
 }
 
 public class ExpoAudioStreamingModule: Module {
+  private var audioManager: AudioEngineManager!
   private var audioPlayer: AudioPlayer!
   private var audioRecorder: AudioRecorder!
 
@@ -225,26 +280,34 @@ public class ExpoAudioStreamingModule: Module {
 
     Events(PLAYER_BUFFER_PLAYED_EVENT, PLAYER_EMPTY_BUFFER_EVENT, RECORDER_NEW_BUFFER_EVENT)
     
-    /* ------- PLAYER ------- */
-    Function("initPlayer") { (sampleRate: Double, channels: Int) in
-      let config = PlayerConfiguration(sampleRate: sampleRate, channels: channels)
-      
-      self.audioPlayer = AudioPlayer(config: config)
+    Function("init") { (recorderSampleRate: Double, playerSampleRate: Double, playerChannels: Int) in
+      self.audioManager = AudioEngineManager(recorderSampleRate: recorderSampleRate, playerSampleRate: playerSampleRate, playerChannels: playerChannels)
+      self.audioPlayer = audioManager.player
+      self.audioRecorder = audioManager.recorder
+
+      self.audioRecorder.onNewBuffer = self.onRecorderBuffer
       self.audioPlayer.onBufferPlayed = self.onPlayerBufferPlayed
       self.audioPlayer.onBufferFinished = self.onPlayerBufferFinished
+      
+      self.audioManager.startAudioSession()
     }
-
+    
+    Function("destroy") {
+      self.audioManager.stopAudioSession()
+    }
+    
+    /* ------- PLAYER ------- */
     Function("playPlayer") {
-      self.audioPlayer.play()
+      self.audioManager.playerStart()
     }
 
     Function("pausePlayer") {
-      self.audioPlayer.pause()
-    }    
+      self.audioManager.playerStop()
+    }
 
     Function("addToQueuePlayer") { (chunk: String) in
       guard let audioBuffer = self.audioPlayer.decodeAudioData(chunk) else {
-        print("failed auido buffer")
+        NSLog("[ExpoAudioStreaming] failed auido buffer")
         return
       }
 
@@ -252,25 +315,12 @@ public class ExpoAudioStreamingModule: Module {
     }
     
     /* ------- RECORDER ------- */
-    Function("initRecorder") { (outputSampleRate: Double) in
-      let config = RecorderConfiguration(outputSampleRate: outputSampleRate)
-
-      self.audioRecorder = AudioRecorder(config: config)
-      self.audioRecorder.onNewBuffer = self.onRecorderBuffer
-    }
-
-    AsyncFunction("startRecorder") { [weak self] (promise: Promise) in
-      DispatchQueue.global(qos: .background).async {
-        self?.audioRecorder.start()
-        
-        DispatchQueue.main.async {
-          promise.resolve()
-        }
-      }
+    Function("startRecorder") {
+      self.audioManager.recordStart()
     }
 
     Function("stopRecorder") {
-      self.audioRecorder.stop()
+      self.audioManager.recordStop()
     }
   }
   
