@@ -188,6 +188,12 @@ class AudioPlayer {
   func isPlaying() -> Bool {
     return player.isPlaying
   }
+  
+  func reset() {
+    player.stop()
+    player.reset()
+    buffersInQueue = 0
+  }
 }
 
 class AudioRecorder {
@@ -312,6 +318,10 @@ public class ExpoAudioStreamingModule: Module {
       }
 
       self.audioPlayer.addToBuffer(buffer: audioBuffer)
+    }
+    
+    Function("resetBuffer") {
+      self.audioPlayer.reset()
     }
     
     /* ------- RECORDER ------- */

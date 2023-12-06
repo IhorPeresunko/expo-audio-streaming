@@ -33,6 +33,10 @@ export const Player = {
   addToQueue(base64: string) {
     ExpoAudioStreamingModule.addToQueuePlayer(base64);
   },
+
+  resetBuffer(): void {
+    ExpoAudioStreamingModule.resetBuffer();
+  },
 };
 
 export const Recorder = {

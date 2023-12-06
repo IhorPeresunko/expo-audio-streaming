@@ -8,12 +8,12 @@ import Spinner from "./Spinner";
 import { useEffect } from "react";
 
 export default function App() {
-  const { addToBuffer, play, pause, playing } = usePlayer();
+  const { addToBuffer, play, pause, playing, resetBuffer } = usePlayer();
   const { start, stop, recording, buffer } = useRecorder();
 
   useEffect(() => {
     AudioSession.init({
-      playerSampleRate: 44100,
+      playerSampleRate: 16000,
       recorderSampleRate: 44100,
     });
 
@@ -26,7 +26,7 @@ export default function App() {
     for (let i = 0; i < audio.length; i++) {
       setTimeout(() => {
         addToBuffer(audio[i]);
-      }, i * 100);
+      }, 0);
     }
   };
 
@@ -51,6 +51,10 @@ export default function App() {
 
       <TouchableOpacity onPress={startStreamingMockData} style={styles.button}>
         <Text>Stream mock buffer to player</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={resetBuffer} style={styles.button}>
+        <Text>Reset Buffer</Text>
       </TouchableOpacity>
 
       <Text style={styles.p}>--------</Text>

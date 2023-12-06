@@ -46,6 +46,7 @@ export const usePlayer = ({
     play,
     pause,
     addToBuffer,
+    resetBuffer: Player.resetBuffer,
 
     playing,
   };
