@@ -1,6 +1,6 @@
 {
   "name": "expo-audio-streaming",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Module to play dynamic audio stream and record audio stream from microphone",
   "main": "build/index.js",
   "types": "build/index.d.ts",

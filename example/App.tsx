@@ -14,7 +14,8 @@ export default function App() {
   useEffect(() => {
     AudioSession.init({
       playerSampleRate: 16000,
-      recorderSampleRate: 44100,
+      recorderSampleRate: 16000,
+      recorderBufferSize: 2048,
     });
 
     return () => {

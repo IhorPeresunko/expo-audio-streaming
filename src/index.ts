@@ -61,11 +61,15 @@ export const AudioSession = {
       playerSampleRate: 44100,
       playerChannels: 1,
       recorderSampleRate: 44100,
+      recorderBufferSize: 2048,
+      recorderChannels: 1,
       ...config,
     };
 
     ExpoAudioStreamingModule.init(
       c.recorderSampleRate,
+      c.recorderBufferSize,
+      c.recorderChannels,
       c.playerSampleRate,
       c.playerChannels
     );

@@ -14,6 +14,8 @@ struct PlayerConfiguration {
 
 struct RecorderConfiguration {
   let outputSampleRate: Double
+  let outputBufferSize: AVAudioFrameCount
+  let outputChannels: AVAudioChannelCount
   let engine: AVAudioEngine
 }
 
@@ -22,9 +24,22 @@ class AudioEngineManager {
   let recorder: AudioRecorder
   let player: AudioPlayer
 
-  init(recorderSampleRate: Double, playerSampleRate: Double, playerChannels: Int) {
-    self.recorder = AudioRecorder(config: RecorderConfiguration(outputSampleRate: recorderSampleRate, engine: engine))
-    self.player = AudioPlayer(config: PlayerConfiguration(sampleRate: playerSampleRate, channels: playerChannels, engine: engine))
+  init(recorderSampleRate: Double, recorderBufferSize: AVAudioFrameCount, recorderChannels: AVAudioChannelCount, playerSampleRate: Double, playerChannels: Int) {
+    let recorderConfig = RecorderConfiguration(
+      outputSampleRate: recorderSampleRate,
+      outputBufferSize: recorderBufferSize,
+      outputChannels: recorderChannels,
+      engine: engine
+    )
+    
+    let playerConfig = PlayerConfiguration(
+      sampleRate: playerSampleRate,
+      channels: playerChannels,
+      engine: engine
+    )
+
+    self.recorder = AudioRecorder(config: recorderConfig)
+    self.player = AudioPlayer(config: playerConfig)
   }
 
   func startAudioSession() {
@@ -203,15 +218,18 @@ class AudioRecorder {
   private var outputSampleRate: Double
   private var outputFormat: AVAudioFormat
   private let inputNode: AVAudioInputNode
-  
+  private var bufferSize: AVAudioFrameCount
+  private var channels: AVAudioChannelCount
 
   var onNewBuffer: ((String) -> Void)?
 
   init(config: RecorderConfiguration) {
     self.engine = config.engine
-
     self.outputSampleRate = config.outputSampleRate
-    self.outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: outputSampleRate, channels: 1, interleaved: true)!
+    self.bufferSize = config.outputBufferSize
+    self.channels = config.outputChannels
+
+    self.outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: outputSampleRate, channels: channels, interleaved: true)!
     
     self.inputNode = engine.inputNode
   }
@@ -221,15 +239,15 @@ class AudioRecorder {
 
     let inputFormat = inputNode.inputFormat(forBus: 0)
 
-    inputNode.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] (buffer, _) in
+    NSLog("[ExpoAudioStreaming] input: \(inputFormat). output: \(self.outputFormat)")
+    
+    inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer, _) in
       guard let self = self else { return }
-      
-      if (inputFormat.sampleRate != self.outputFormat.sampleRate) {
-        if let outputBuffer = self.convertSampleRate(inputBuffer: buffer) {
-          self.processBuffer(outputBuffer)
-        }
+    
+      if let outputBuffer = self.convertSampleRate(inputBuffer: buffer) {
+        self.processBuffer(outputBuffer)
       } else {
-        self.processBuffer(buffer)
+        NSLog("[ExpoAudioStreaming] Failed to convert recorder buffer to output format")
       }
     }
 
@@ -286,8 +304,14 @@ public class ExpoAudioStreamingModule: Module {
 
     Events(PLAYER_BUFFER_PLAYED_EVENT, PLAYER_EMPTY_BUFFER_EVENT, RECORDER_NEW_BUFFER_EVENT)
     
-    Function("init") { (recorderSampleRate: Double, playerSampleRate: Double, playerChannels: Int) in
-      self.audioManager = AudioEngineManager(recorderSampleRate: recorderSampleRate, playerSampleRate: playerSampleRate, playerChannels: playerChannels)
+    Function("init") { (recorderSampleRate: Double, recorderBufferSize: AVAudioFrameCount, recorderChannels: AVAudioChannelCount, playerSampleRate: Double, playerChannels: Int) in
+      self.audioManager = AudioEngineManager(
+        recorderSampleRate: recorderSampleRate,
+        recorderBufferSize: recorderBufferSize,
+        recorderChannels: recorderChannels,
+        playerSampleRate: playerSampleRate,
+        playerChannels: playerChannels
+      )
       self.audioPlayer = audioManager.player
       self.audioRecorder = audioManager.recorder
 
