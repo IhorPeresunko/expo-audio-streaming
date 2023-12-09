@@ -25,6 +25,8 @@ class AudioEngineManager {
   let player: AudioPlayer
 
   init(recorderSampleRate: Double, recorderBufferSize: AVAudioFrameCount, recorderChannels: AVAudioChannelCount, playerSampleRate: Double, playerChannels: Int) {
+    try! engine.inputNode.setVoiceProcessingEnabled(true)
+    
     let recorderConfig = RecorderConfiguration(
       outputSampleRate: recorderSampleRate,
       outputBufferSize: recorderBufferSize,
@@ -92,6 +94,18 @@ class AudioEngineManager {
       engine.stop()
     }
     self.recorder.stop()
+  }
+  
+  func isInSpeakerMode() -> Bool {
+    let currentRoute = AVAudioSession.sharedInstance().currentRoute
+    for output in currentRoute.outputs {
+      if output.portType == .builtInSpeaker {
+        return true
+      } else if output.portType == .headphones || output.portType == .bluetoothA2DP {
+        return false
+      }
+    }
+    return false
   }
 }
 
@@ -324,6 +338,10 @@ public class ExpoAudioStreamingModule: Module {
     
     Function("destroy") {
       self.audioManager.stopAudioSession()
+    }
+    
+    Function("isInSpeakerMode") {
+      return self.audioManager.isInSpeakerMode()
     }
     
     /* ------- PLAYER ------- */
